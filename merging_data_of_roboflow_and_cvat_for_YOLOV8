@@ -1,0 +1,437 @@
+{
+  "cells": [
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "view-in-github",
+        "colab_type": "text"
+      },
+      "source": [
+        "<a href=\"https://colab.research.google.com/github/Noors-lab/toll-plaza-vision-system/blob/main/merging_data_of_roboflow_and_cvat_for_YOLOV8\" target=\"_parent\"><img src=\"https://colab.research.google.com/assets/colab-badge.svg\" alt=\"Open In Colab\"/></a>"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "from google.colab import drive\n",
+        "drive.mount('/content/drive')"
+      ],
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "VX2TnS_3oLAO",
+        "outputId": "0075f305-5b1f-4cf0-b4d1-b58d0e7fd57b"
+      },
+      "id": "VX2TnS_3oLAO",
+      "execution_count": 1,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "Mounted at /content/drive\n"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "import os\n",
+        "print(os.listdir(\"/content/drive/MyDrive/cvat_export/\"))"
+      ],
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "pmJpWGWsvwQH",
+        "outputId": "53fc79c2-30e3-4139-b38f-dc7b71a4d045"
+      },
+      "id": "pmJpWGWsvwQH",
+      "execution_count": 2,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "['cvat_export.zip']\n"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "import zipfile, os\n",
+        "\n",
+        "# Extract CVAT export\n",
+        "with zipfile.ZipFile('/content/drive/MyDrive/cvat_export/cvat_export.zip', 'r') as z:\n",
+        "    z.extractall('/content/cvat_data')\n",
+        "\n",
+        "# Extract Roboflow export\n",
+        "with zipfile.ZipFile('/content/drive/MyDrive/roboflow_export/toll-plaza-vision-system.yolov8.zip', 'r') as z:\n",
+        "    z.extractall('/content/roboflow_data')\n",
+        "\n",
+        "# Check structures\n",
+        "print(\"CVAT structure:\")\n",
+        "for root, dirs, files in os.walk('/content/cvat_data'):\n",
+        "    level = root.replace('/content/cvat_data', '').count(os.sep)\n",
+        "    indent = ' ' * 2 * level\n",
+        "    print(f'{indent}{os.path.basename(root)}/')\n",
+        "    if level < 2:\n",
+        "        subindent = ' ' * 2 * (level + 1)\n",
+        "        for file in files[:3]:\n",
+        "            print(f'{subindent}{file}')\n",
+        "\n",
+        "print(\"\\nRoboflow structure:\")\n",
+        "for root, dirs, files in os.walk('/content/roboflow_data'):\n",
+        "    level = root.replace('/content/roboflow_data', '').count(os.sep)\n",
+        "    indent = ' ' * 2 * level\n",
+        "    print(f'{indent}{os.path.basename(root)}/')\n",
+        "    if level < 2:\n",
+        "        subindent = ' ' * 2 * (level + 1)\n",
+        "        for file in files[:3]:\n",
+        "            print(f'{subindent}{file}')"
+      ],
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "5SZ9a_HzwYM6",
+        "outputId": "ad91fbcb-b94b-42d2-a838-aef1fa5d0509"
+      },
+      "id": "5SZ9a_HzwYM6",
+      "execution_count": 3,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "CVAT structure:\n",
+            "cvat_data/\n",
+            "  train.txt\n",
+            "  obj.names\n",
+            "  obj.data\n",
+            "  obj_train_data/\n",
+            "    cvat_upload/\n",
+            "\n",
+            "Roboflow structure:\n",
+            "roboflow_data/\n",
+            "  README.roboflow.txt\n",
+            "  data.yaml\n",
+            "  README.dataset.txt\n",
+            "  train/\n",
+            "    labels/\n",
+            "    images/\n"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "import os, shutil, random\n",
+        "\n",
+        "# Output folders\n",
+        "MERGED_IMAGES = '/content/merged/images'\n",
+        "MERGED_LABELS = '/content/merged/labels'\n",
+        "os.makedirs(MERGED_IMAGES, exist_ok=True)\n",
+        "os.makedirs(MERGED_LABELS, exist_ok=True)\n",
+        "\n",
+        "# ─── 1. Copy Roboflow data ───\n",
+        "rf_images = '/content/roboflow_data/train/images'\n",
+        "rf_labels = '/content/roboflow_data/train/labels'\n",
+        "\n",
+        "rf_count = 0\n",
+        "for img in os.listdir(rf_images):\n",
+        "    name = os.path.splitext(img)[0]\n",
+        "    img_src = os.path.join(rf_images, img)\n",
+        "    lbl_src = os.path.join(rf_labels, name + '.txt')\n",
+        "    if os.path.exists(lbl_src):\n",
+        "        shutil.copy(img_src, os.path.join(MERGED_IMAGES, img))\n",
+        "        shutil.copy(lbl_src, os.path.join(MERGED_LABELS, name + '.txt'))\n",
+        "        rf_count += 1\n",
+        "\n",
+        "print(f\"Roboflow images merged: {rf_count}\")\n",
+        "\n",
+        "# ─── 2. Copy CVAT data ───\n",
+        "cvat_images = '/content/cvat_data/obj_train_data/cvat_upload'\n",
+        "cvat_labels = '/content/cvat_data/obj_train_data/cvat_upload'\n",
+        "\n",
+        "cvat_count = 0\n",
+        "for f in os.listdir(cvat_images):\n",
+        "    if f.endswith('.jpg') or f.endswith('.png'):\n",
+        "        name = os.path.splitext(f)[0]\n",
+        "        img_src = os.path.join(cvat_images, f)\n",
+        "        lbl_src = os.path.join(cvat_labels, name + '.txt')\n",
+        "        if os.path.exists(lbl_src):\n",
+        "            shutil.copy(img_src, os.path.join(MERGED_IMAGES, f))\n",
+        "            shutil.copy(lbl_src, os.path.join(MERGED_LABELS, name + '.txt'))\n",
+        "            cvat_count += 1\n",
+        "\n",
+        "print(f\"CVAT images merged: {cvat_count}\")\n",
+        "print(f\"Total merged: {rf_count + cvat_count}\")"
+      ],
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "hbXZHzyOw9m8",
+        "outputId": "5810c780-88b2-4dce-e465-c16dc2df81b9"
+      },
+      "id": "hbXZHzyOw9m8",
+      "execution_count": 4,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "Roboflow images merged: 1593\n",
+            "CVAT images merged: 0\n",
+            "Total merged: 1593\n"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "#CVAT images merged 0 so labels and images are in different location,,, such pain,, story of my life\n"
+      ],
+      "metadata": {
+        "id": "6OMlTIYfxOdH"
+      },
+      "id": "6OMlTIYfxOdH"
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# Checking what's actually inside the CVAT folder\n",
+        "cvat_folder = '/content/cvat_data/obj_train_data/cvat_upload'\n",
+        "files = os.listdir(cvat_folder)\n",
+        "print(f\"Total files: {len(files)}\")\n",
+        "print(\"Sample files:\")\n",
+        "print(files[:10])"
+      ],
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "O89YXhF4xMTt",
+        "outputId": "9df04741-d30e-4208-d4f2-8f82c94baaf4"
+      },
+      "id": "O89YXhF4xMTt",
+      "execution_count": 5,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "Total files: 1343\n",
+            "Sample files:\n",
+            "['rain_fog_moving_06208.txt', 'rain_fog_moving_04430.txt', 'night_cctv_02064.txt', 'rain_fog_moving_05948.txt', 'rain_fog_moving_08115.txt', 'rain_fog_moving_01692.txt', 'night_moving_01109.txt', 'rain_fog_moving_04229.txt', 'rain_fog_moving_07445.txt', 'rain_fog_moving_01814.txt']\n"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "cvat_labels_folder = '/content/cvat_data/obj_train_data/cvat_upload'\n",
+        "cvat_images_folder = '/content/drive/MyDrive/vision_data/cvat_upload'\n",
+        "\n",
+        "cvat_count = 0\n",
+        "missing = 0\n",
+        "\n",
+        "for f in os.listdir(cvat_labels_folder):\n",
+        "    if f.endswith('.txt'):\n",
+        "        name = os.path.splitext(f)[0]\n",
+        "        img_name = name + '.jpg'\n",
+        "\n",
+        "        img_src = os.path.join(cvat_images_folder, img_name)\n",
+        "        lbl_src = os.path.join(cvat_labels_folder, f)\n",
+        "\n",
+        "        if os.path.exists(img_src):\n",
+        "            shutil.copy(img_src, os.path.join(MERGED_IMAGES, img_name))\n",
+        "            shutil.copy(lbl_src, os.path.join(MERGED_LABELS, f))\n",
+        "            cvat_count += 1\n",
+        "        else:\n",
+        "            missing += 1\n",
+        "\n",
+        "print(f\"CVAT images merged: {cvat_count}\")\n",
+        "print(f\"Missing images: {missing}\")\n",
+        "print(f\"Total merged: {rf_count + cvat_count}\")"
+      ],
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "_3jvYDztyCmk",
+        "outputId": "4b541e05-283d-4e90-98de-da374c5f7317"
+      },
+      "id": "_3jvYDztyCmk",
+      "execution_count": 6,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "CVAT images merged: 1343\n",
+            "Missing images: 0\n",
+            "Total merged: 2936\n"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "# stratified spliting"
+      ],
+      "metadata": {
+        "id": "Ar-zCCuz1l6G"
+      },
+      "id": "Ar-zCCuz1l6G"
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "import random\n",
+        "from collections import defaultdict\n",
+        "\n",
+        "# Group images by condition (night/rain/day) as proxy for stratification\n",
+        "groups = defaultdict(list)\n",
+        "for img in os.listdir(MERGED_IMAGES):\n",
+        "    if 'night_moving' in img:\n",
+        "        groups['night_moving'].append(img)\n",
+        "    elif 'rain_fog' in img:\n",
+        "        groups['rain_fog'].append(img)\n",
+        "    elif 'night_cctv' in img:\n",
+        "        groups['night_cctv'].append(img)\n",
+        "    elif 'day_cctv' in img:\n",
+        "        groups['day_cctv'].append(img)\n",
+        "    else:\n",
+        "        groups['other'].append(img)\n",
+        "\n",
+        "train_files, val_files, test_files = [], [], []\n",
+        "\n",
+        "for group, files in groups.items():\n",
+        "    random.shuffle(files)\n",
+        "    total = len(files)\n",
+        "    t_end = int(total * 0.70)\n",
+        "    v_end = int(total * 0.85)\n",
+        "    train_files += files[:t_end]\n",
+        "    val_files += files[t_end:v_end]\n",
+        "    test_files += files[v_end:]\n",
+        "    print(f\"{group}: train={t_end} val={v_end-t_end} test={total-v_end}\")\n",
+        "\n",
+        "print(f\"\\nTotal — Train: {len(train_files)} Val: {len(val_files)} Test: {len(test_files)}\")"
+      ],
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "MUPAE8A_1pC1",
+        "outputId": "96631177-f0c1-4946-8be7-bd4ab98dd807"
+      },
+      "id": "MUPAE8A_1pC1",
+      "execution_count": 7,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "night_moving: train=700 val=150 test=150\n",
+            "rain_fog: train=700 val=150 test=150\n",
+            "night_cctv: train=560 val=120 test=120\n",
+            "day_cctv: train=95 val=20 test=21\n",
+            "\n",
+            "Total — Train: 2055 Val: 440 Test: 441\n"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "#saving the splits in drive"
+      ],
+      "metadata": {
+        "id": "Mg2_CVoH2ISt"
+      },
+      "id": "Mg2_CVoH2ISt"
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# Create split folders\n",
+        "for split in ['train', 'val', 'test']:\n",
+        "    os.makedirs(f'/content/final_dataset/{split}/images', exist_ok=True)\n",
+        "    os.makedirs(f'/content/final_dataset/{split}/labels', exist_ok=True)\n",
+        "\n",
+        "# Copy files\n",
+        "def copy_split(files, split):\n",
+        "    for img in files:\n",
+        "        name = os.path.splitext(img)[0]\n",
+        "        shutil.copy(os.path.join(MERGED_IMAGES, img), f'/content/final_dataset/{split}/images/{img}')\n",
+        "        lbl = name + '.txt'\n",
+        "        lbl_src = os.path.join(MERGED_LABELS, lbl)\n",
+        "        if os.path.exists(lbl_src):\n",
+        "            shutil.copy(lbl_src, f'/content/final_dataset/{split}/labels/{lbl}')\n",
+        "\n",
+        "copy_split(train_files, 'train')\n",
+        "copy_split(val_files, 'val')\n",
+        "copy_split(test_files, 'test')\n",
+        "print(\"Split done!\")\n",
+        "\n",
+        "# Save to Drive immediately\n",
+        "shutil.copytree('/content/final_dataset', '/content/drive/MyDrive/final_dataset')\n",
+        "print(\"Saved to Drive!\")"
+      ],
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "9RNqtOv72KHT",
+        "outputId": "07561134-707f-40c6-c8b1-d8a916daedb1"
+      },
+      "id": "9RNqtOv72KHT",
+      "execution_count": 8,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "Split done!\n",
+            "Saved to Drive!\n"
+          ]
+        }
+      ]
+    }
+  ],
+  "metadata": {
+    "colab": {
+      "provenance": [],
+      "include_colab_link": true
+    },
+    "kernelspec": {
+      "display_name": "Python 3",
+      "name": "python3"
+    },
+    "language_info": {
+      "codemirror_mode": {
+        "name": "ipython",
+        "version": 3
+      },
+      "file_extension": ".py",
+      "mimetype": "text/x-python",
+      "name": "python",
+      "nbconvert_exporter": "python",
+      "pygments_lexer": "ipython3",
+      "version": "3.12.3"
+    }
+  },
+  "nbformat": 4,
+  "nbformat_minor": 5
+}
